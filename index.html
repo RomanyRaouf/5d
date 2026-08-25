@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامج تسجيل الحضور والغياب</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #e67e22;
+            --bg-color: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Cairo, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h2, h3 { text-align: center; color: var(--primary-color); }
+
+        .controls, .search-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 10px;
+            flex-wrap: wrap;
+            background: #f1f2f6;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        input[type="text"], input[type="date"], select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: opacity 0.3s;
+        }
+
+        button:hover { opacity: 0.9; }
+        .btn-absent-list { background-color: var(--danger-color); }
+        .btn-reset { background-color: #7f8c8d; }
+
+        .students-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .student-card {
+            background: #fff;
+            border: 2px solid #ddd;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .student-card .s-name { font-weight: bold; font-size: 16px; margin-bottom: 5px; }
+        .student-card .s-info { font-size: 12px; color: #666; margin-bottom: 3px; }
+        .student-card .s-class { font-size: 12px; color: var(--accent-color); font-weight: bold; }
+
+        .student-card.selected-absent { background-color: #fdedec; border-color: var(--danger-color); color: var(--danger-color); }
+        .student-card.selected-present { background-color: #e8f8f5; border-color: var(--success-color); color: var(--success-color); }
+
+        .report-section {
+            background: #f1f2f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .loading { text-align: center; font-weight: bold; color: var(--accent-color); padding: 20px; }
+        .saving-indicator { font-size: 11px; color: var(--warning-color); font-weight: bold; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>برنامج تسجيل الحضور والغياب </h2>
+    <h2>   إعداد روماني رؤوف</h2>
+    <div class="controls">
+        <div>
+            <label>التاريخ: </label>
+            <input type="date" id="attendanceDate" onchange="onDateChange()">
+        </div>
+        <div style="flex: 1; text-align: left;">
+            <span id="statusMsg" style="font-weight: bold; color: var(--success-color); font-size: 13px;">الحفظ يتم فورياً عند الضغط على أي طالب ✓</span>
+        </div>
+    </div>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="ابحث بالاسم، الكود، الرقم القومي، أو الفصل..." onkeyup="filterStudents()" style="flex: 1;">
+        <button class="btn-absent-list" onclick="showAbsentTodayList()">أسماء الغائبين اليوم</button>
+        <button class="btn-reset" onclick="resetFilter()">إلغاء الفلترة / الكل</button>
+        <button onclick="generateReport()">تقرير الغياب الشامل</button>
+    </div>
+
+    <div id="loading" class="loading">جاري جلب بيانات الطلاب من الشيت...</div>
+
+    <div id="studentsContainer" class="students-grid"></div>
+
+    <div id="reportContainer" class="report-section" style="display: none;">
+        <h3 id="reportTitle">تقرير الغياب</h3>
+        <div id="reportContent"></div>
+    </div>
+</div>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwhgzT4mdtvpUDD7WiS1DqeLzfJk3j53mlqf1Y8LzjSAR0OkbxKlkNUYA2l6RKW7A9R/exec";
+    
+    let studentsData = [];
+    let headersData = [];
+    
+    document.getElementById('attendanceDate').valueAsDate = new Date();
+
+    async function fetchStudents() {
+        try {
+            let response = await fetch(`${WEB_APP_URL}?action=getStudents`);
+            let result = await response.json();
+            headersData = result.headers;
+            studentsData = result.students;
+            
+            studentsData.forEach(s => {
+                s.tempSelection = 'present';
+            });
+
+            updateStudentSelectionsFromHistory();
+            document.getElementById('loading').style.display = 'none';
+            renderStudents(studentsData);
+        } catch (error) {
+            document.getElementById('loading').textContent = 'حدث خطأ أثناء الاتصال بملف الشيت!';
+        }
+    }
+
+    function updateStudentSelectionsFromHistory() {
+        let currentDate = document.getElementById('attendanceDate').value;
+        let dateIndex = headersData.indexOf(currentDate);
+        
+        studentsData.forEach(student => {
+            if (dateIndex !== -1 && student.attendance[dateIndex]) {
+                student.tempSelection = (student.attendance[dateIndex] === 'غياب') ? 'absent' : 'present';
+            } else {
+                student.tempSelection = 'present';
+            }
+        });
+    }
+
+    function onDateChange() {
+        updateStudentSelectionsFromHistory();
+        renderStudents(studentsData);
+        document.getElementById('reportContainer').style.display = 'none';
+    }
+
+    function renderStudents(list) {
+        const container = document.getElementById('studentsContainer');
+        container.innerHTML = '';
+
+        if (list.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 20px;">لا توجد نتائج مطابقة للبحث</div>';
+            return;
+        }
+
+        list.forEach(student => {
+            const card = document.createElement('div');
+            card.className = 'student-card';
+            
+            if (student.tempSelection === 'absent') {
+                card.classList.add('selected-absent');
+            } else {
+                card.classList.add('selected-present');
+            }
+
+            let statusTextLabel = student.tempSelection === 'present' ? 'حاضر' : 'غياب';
+
+            card.innerHTML = `
+                <div class="s-name">${student.name}</div>
+                <div class="s-info">الكود: ${student.code} | القومي: ${student.nationalId}</div>
+                <div class="s-class">الفصل: ${student.classRoom || 'غير محدد'}</div>
+                <div style="margin-top: 5px; font-size: 13px; font-weight: bold;">الحالة: ${statusTextLabel}</div>
+                <div class="saving-indicator" id="indicator-${student.row}"></div>
+            `;
+            
+            card.onclick = () => toggleAndSave(student, card);
+            container.appendChild(card);
+        });
+    }
+
+    async function toggleAndSave(student, cardElement) {
+        let currentDate = document.getElementById('attendanceDate').value;
+        if (!currentDate) {
+            alert("يرجى اختيار التاريخ أولاً!");
+            return;
+        }
+
+        student.tempSelection = (student.tempSelection === 'present') ? 'absent' : 'present';
+        
+        if (student.tempSelection === 'absent') {
+            cardElement.className = 'student-card selected-absent';
+            cardElement.querySelector('div:nth-child(4)').textContent = 'الحالة: غياب';
+        } else {
+            cardElement.className = 'student-card selected-present';
+            cardElement.querySelector('div:nth-child(4)').textContent = 'الحالة: حاضر';
+        }
+
+        let indicator = document.getElementById(`indicator-${student.row}`);
+        if(indicator) indicator.textContent = "جاري الحفظ...";
+
+        let statusToSend = (student.tempSelection === 'present') ? 'حاضر' : 'غياب';
+        let targetUrl = `${WEB_APP_URL}?action=saveInstant&row=${student.row}&date=${currentDate}&status=${encodeURIComponent(statusToSend)}`;
+
+        const img = new Image();
+        img.onload = img.onerror = () => {
+            if(indicator) {
+                indicator.textContent = "تم الحفظ ✓";
+                setTimeout(() => { indicator.textContent = ""; }, 1500);
+            }
+        };
+        img.src = targetUrl;
+
+        let dateIndex = headersData.indexOf(currentDate);
+        if (dateIndex === -1) {
+            headersData.push(currentDate);
+            dateIndex = headersData.length - 1;
+        }
+        student.attendance[dateIndex] = statusToSend;
+    }
+
+    function showAbsentTodayList() {
+        let currentDate = document.getElementById('attendanceDate').value;
+        let absentStudents = studentsData.filter(s => s.tempSelection === 'absent');
+        
+        let reportContainer = document.getElementById('reportContainer');
+        let reportTitle = document.getElementById('reportTitle');
+        let reportContent = document.getElementById('reportContent');
+        
+        reportContainer.style.display = 'block';
+        reportTitle.textContent = `قائمة الطلاب الغائبين ليوم (${currentDate})`;
+
+        if (absentStudents.length === 0) {
+            reportContent.innerHTML = '<p style="text-align:center; color: var(--success-color); font-weight: bold;">ممتاز! لا توجد حالات غياب مسجلة في هذا التاريخ.</p>';
+            return;
+        }
+
+        let html = `<table border="1" cellpadding="8" style="width:100%; border-collapse: collapse; text-align: center;">
+            <tr style="background:#e74c3c; color:white;">
+                <th>مسلسل</th>
+                <th>اسم الطالب</th>
+                <th>الكود</th>
+                <th>الفصل</th>
+                <th>الرقم القومي</th>
+            </tr>`;
+
+        absentStudents.forEach((student, index) => {
+            html += `<tr>
+                <td>${index + 1}</td>
+                <td>${student.name}</td>
+                <td>${student.code}</td>
+                <td><strong>${student.classRoom || 'غير محدد'}</strong></td>
+                <td>${student.nationalId}</td>
+            </tr>`;
+        });
+
+        html += `</table>`;
+        reportContent.innerHTML = html;
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function resetFilter() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('reportContainer').style.display = 'none';
+        renderStudents(studentsData);
+    }
+
+    function filterStudents() {
+        let query = document.getElementById('searchInput').value.toLowerCase();
+        let filtered = studentsData.filter(s => 
+            String(s.name).toLowerCase().includes(query) ||
+            String(s.code).toLowerCase().includes(query) ||
+            String(s.nationalId).toLowerCase().includes(query) ||
+            String(s.classRoom).toLowerCase().includes(query)
+        );
+        renderStudents(filtered);
+    }
+
+    function generateReport() {
+        let reportContainer = document.getElementById('reportContainer');
+        let reportTitle = document.getElementById('reportTitle');
+        let reportContent = document.getElementById('reportContent');
+        
+        reportContainer.style.display = 'block';
+        reportTitle.textContent = "تقرير الغياب الشامل لكل الأيام";
+
+        let html = `<table border="1" cellpadding="8" style="width:100%; border-collapse: collapse; text-align: center;">
+            <tr style="background:#ddd;">
+                <th>اسم الطالب</th>
+                <th>الكود</th>
+                <th>الفصل</th>
+                <th>إجمالي أيام الغياب</th>
+            </tr>`;
+
+        studentsData.forEach(student => {
+            let absentDaysCount = 0;
+            for (let i = 4; i < headersData.length; i++) { // يبدأ من العمود الرابع (حسب ترتيب أعمدة الشيت الجديدة)
+                if (student.attendance[i] === 'غياب') absentDaysCount++;
+            }
+            html += `<tr><td>${student.name}</td><td>${student.code}</td><td>${student.classRoom || '-'}</td><td><strong style="color:red;">${absentDaysCount} أيام</strong></td></tr>`;
+        });
+
+        html += `</table>`;
+        reportContent.innerHTML = html;
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    fetchStudents();
+</script>
+
+</body>
+</html>
