@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -138,7 +139,7 @@
 </div>
 
 <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzOHXBaTGYEUeUNoQm73Oevx-icJ2OPjV42rKrfRAU1jYhYBcAXUFpKC4EpRC98yejc/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzoTDZxgnnctIBSw6y0o97tNhID6e2ZPjHyy8MBFOIObOCCItD_fT_8ccmTO_htYNZw/exec";
     
     let studentsData = [];
     let headersData = [];
@@ -183,7 +184,7 @@
         document.getElementById('reportContainer').style.display = 'none';
     }
 
-    function renderStudents(list) {
+ function renderStudents(list) {
         const container = document.getElementById('studentsContainer');
         container.innerHTML = '';
 
@@ -205,10 +206,12 @@
             let statusTextLabel = student.tempSelection === 'present' ? 'حاضر' : 'غياب';
 
             card.innerHTML = `
-                <div class="s-name">${student.name}</div>
-                <div class="s-info">الكود: ${student.code} | القومي: ${student.nationalId}</div>
-                <div class="s-class">الفصل: ${student.classRoom || 'غير محدد'}</div>
-                <div style="margin-top: 5px; font-size: 13px; font-weight: bold;">الحالة: ${statusTextLabel}</div>
+                <div class="s-name" style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">${student.name}</div>
+                <div class="s-info" style="font-size: 13px; color: #555; margin-bottom: 4px;">الكود: ${student.code} | القومي:</div>
+                <div class="s-info" style="font-size: 13px; color: #555; margin-bottom: 4px;">${student.nationalId}</div>
+                <div class="s-class" style="font-size: 14px; font-weight: bold; color: var(--accent-color); margin-bottom: 6px;">الفصل: ${student.classRoom || 'غير محدد'}</div>
+                <div style="font-size: 15px; font-weight: bold; color: #c0392b; margin-bottom: 6px;">أيام الغياب: <span style="font-size: 17px;">${student.absentCount ?? 0}</span></div>
+                <div style="font-size: 14px; font-weight: bold; padding-top: 4px; border-top: 1px dashed rgba(0,0,0,0.1);">الحالة: ${statusTextLabel}</div>
                 <div class="saving-indicator" id="indicator-${student.row}"></div>
             `;
             
@@ -344,6 +347,35 @@
     }
 
     fetchStudents();
+    function generateReport() {
+        let reportContainer = document.getElementById('reportContainer');
+        let reportTitle = document.getElementById('reportTitle');
+        let reportContent = document.getElementById('reportContent');
+        
+        reportContainer.style.display = 'block';
+        reportTitle.textContent = "تقرير الغياب الشامل (مسحوب من الشيت)";
+
+        let html = `<table border="1" cellpadding="8" style="width:100%; border-collapse: collapse; text-align: center;">
+            <tr style="background:#ddd;">
+                <th>اسم الطالب</th>
+                <th>الكود</th>
+                <th>الفصل</th>
+                <th>إجمالي أيام الغياب</th>
+            </tr>`;
+
+        studentsData.forEach(student => {
+            html += `<tr>
+                <td>${student.name}</td>
+                <td>${student.code}</td>
+                <td>${student.classRoom || '-'}</td>
+                <td><strong style="color:red;">${student.absentCount} أيام</strong></td>
+            </tr>`;
+        });
+
+        html += `</table>`;
+        reportContent.innerHTML = html;
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
 </script>
 
 </body>
