@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -126,7 +127,11 @@
         <button class="btn-absent-list" onclick="showAbsentTodayList()">أسماء الغائبين اليوم</button>
         <button class="btn-reset" onclick="resetFilter()">إلغاء الفلترة / الكل</button>
         <button onclick="generateReport()">تقرير الغياب الشامل</button>
-    </div>
+        <!-- زر تفعيل فلتر الإنذارات -->
+<button onclick="showWarningsReport()" style="background-color: #e74c3c; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 5px;">
+    ⚠️ تقرير إنذارات الغياب (مضاعفات 7 أيام)
+</button>
+            </div>
 
     <div id="loading" class="loading">جاري جلب بيانات الطلاب من الشيت...</div>
 
@@ -140,7 +145,56 @@
 
 <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzoTDZxgnnctIBSw6y0o97tNhID6e2ZPjHyy8MBFOIObOCCItD_fT_8ccmTO_htYNZw/exec";
+    function showWarningsReport() {
+    let reportContainer = document.getElementById('reportContainer');
+    let reportTitle = document.getElementById('reportTitle');
+    let reportContent = document.getElementById('reportContent');
     
+    reportContainer.style.display = 'block';
+    reportTitle.textContent = "تقرير إنذارات الغياب (الوصول لمضاعفات 7 أيام)";
+
+    // فلترة الطلاب الذين لديهم غياب ومضاعفات الرقم 7 (أكبر من أو يساوي 7 وباقي قسمة الغياب على 7 يساوي صفر)
+    let warningStudents = studentsData.filter(student => {
+        let abs = Number(student.absentCount) || 0;
+        return abs > 0 && abs % 7 === 0;
+    });
+
+    if (warningStudents.length === 0) {
+        reportContent.innerHTML = '<p style="text-align: center; color: #555; padding: 15px;">لا يوجد طلاب مستحقون لإنذارات حالياً (الغياب ليس من مضاعفات الـ 7 أيام).</p>';
+        return;
+    }
+
+    // جلب تاريخ اليوم بصيغة (YYYY-MM-DD)
+    let todayDate = new Date().toISOString().split('T')[0];
+
+    let html = `<table border="1" cellpadding="8" style="width:100%; border-collapse: collapse; text-align: center; background: #fff;">
+        <tr style="background:#f2dede; color: #a94442;">
+            <th>اسم الطالب</th>
+            <th>الكود</th>
+            <th>الفصل</th>
+            <th>إجمالي أيام الغياب</th>
+            <th>نوع الإنذار</th>
+            <th>تاريخ الإنذار</th>
+        </tr>`;
+
+    warningStudents.forEach(student => {
+        let abs = Number(student.absentCount);
+        let warningNumber = abs / 7; // حساب رقم الإنذار (7 أيام = إنذار 1، 14 يوم = إنذار 2، وهكذا)
+
+        html += `<tr>
+            <td><strong>${student.name}</strong></td>
+            <td>${student.code}</td>
+            <td>${student.classRoom || '-'}</td>
+            <td><strong style="color:red; font-size:16px;">${abs} أيام</strong></td>
+            <td><span style="background: #d9534f; color: white; padding: 3px 8px; border-radius: 4px; font-weight: bold;">إنذار رقم ${warningNumber}</span></td>
+            <td><span style="color: #333; font-weight: bold;">${todayDate}</span></td>
+        </tr>`;
+    });
+
+    html += `</table>`;
+    reportContent.innerHTML = html;
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
     let studentsData = [];
     let headersData = [];
     
