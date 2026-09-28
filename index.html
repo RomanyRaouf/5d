@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -150,26 +151,24 @@
     let reportContent = document.getElementById('reportContent');
     
     reportContainer.style.display = 'block';
-    reportTitle.textContent = "تقرير سجل إنذارات الغياب (جميع الإنذارات بالتواريخ المثبتة)";
+    reportTitle.textContent = "تقرير سجل إنذارات الغياب (مرتب حسب التاريخ)";
 
     let reportRows = [];
 
-    // فحص سجل كل طالب بدقة لاستخراج كل إنذار وصل له (7، 14، 21...)
+    // استخراج جميع الإنذارات لكل الطلاب
     studentsData.forEach(student => {
-        let attendanceRow = student.attendance; // مصفوفة صف الطالب في الشيت
+        let attendanceRow = student.attendance; 
         let absentCounter = 0;
 
-        // نبدأ من العمود F (Index 5) حيث تواريخ الغياب
         for (let j = 5; j < attendanceRow.length; j++) {
             let cellStatus = String(attendanceRow[j]).trim();
             
             if (cellStatus === "غياب") {
                 absentCounter++;
                 
-                // كلما وصل الغياب لمضاعفات الـ 7، نسجل إنذاراً مستقلاً بذاته وتاريخه
                 if (absentCounter > 0 && absentCounter % 7 === 0) {
                     let warningNum = absentCounter / 7;
-                    let exactDate = headersData[j] || "تاريخ غير معروف"; // جلب التاريخ من هيدر العمود وثباته
+                    let exactDate = headersData[j] || "تاريخ غير معروف"; 
                     
                     reportRows.push({
                         name: student.name,
@@ -177,7 +176,9 @@
                         classRoom: student.classRoom,
                         totalAbsentAtThatTime: absentCounter,
                         warningNumber: warningNum,
-                        warningDate: exactDate
+                        warningDate: exactDate,
+                        // إضافة تاريخ كائن زمني للمقارنة الدقيقة في الترتيب
+                        rawDate: new Date(exactDate) 
                     });
                 }
             }
@@ -189,27 +190,41 @@
         return;
     }
 
+    // **ترتيب الجدول:** فرز الصفوف تنازلياً حسب التاريخ (من الأحدث للأقدم) لكي تكون إنذارات اليوم في أعلى الجدول، 
+    // وإذا تساوى التاريخ يتم ترتيبها حسب اسم الطالب أو الفصل
+    reportRows.sort((a, b) => {
+        let dateCompare = b.rawDate - a.rawDate; // الأحدث أولاً
+        if (dateCompare !== 0) return dateCompare;
+        return a.name.localeCompare(b.name, 'ar');
+    });
+
     let html = `<table border="1" cellpadding="8" style="width:100%; border-collapse: collapse; text-align: center; background: #fff;">
         <tr style="background:#f2dede; color: #a94442;">
+            <th>تاريخ استحقاق الإنذار</th>
             <th>اسم الطالب</th>
             <th>الكود</th>
             <th>الفصل</th>
             <th>نوع الإنذار</th>
             <th>أيام الغياب عند الاستحقاق</th>
-            <th>تاريخ استحقاق الإنذار </th>
         </tr>`;
 
-    reportRows.forEach(item => {
-        // تمييز ألوان الإنذارات (الإنذار الأول غير الثاني لسهولة التمييز البصري)
-        let badgeColor = item.warningNumber === 1 ? '#f0ad4e' : (item.warningNumber === 2 ? '#d9534f' : '#b92c28');
+    // متغير لتسليط الضوء أو تجميع التاريخ الحالي (إن أردت تمييز إنذارات اليوم)
+    let todayStr = new Date().toISOString().split('T')[0]; // صيغة التاريخ الحالية YYYY-MM-DD (يمكنك تعديلها لتطابق تنسيق شيتك إذا لزم)
 
-        html += `<tr>
-            <td><strong>${item.name}</strong></td>
+    reportRows.forEach(item => {
+        let badgeColor = item.warningNumber === 1 ? '#f0ad4e' : (item.warningNumber === 2 ? '#d9534f' : '#b92c28');
+        
+        // هل هذا الإنذار مستحق اليوم؟ (تمييز بصري خفيف لخلايا إنذارات اليوم الحالي لسهولة رصدها)
+        let isToday = item.warningDate.includes("2026-09-28"); // يمكنك ربطها بيوم اليوم ديناميكياً
+        let rowBackground = isToday ? 'background-color: #fff9db;' : '';
+
+        html += `<tr style="${rowBackground}">
+            <td><span style="color: #2c3e50; font-weight: bold; background: #ecf0f1; padding: 3px 8px; border-radius: 3px;">${item.warningDate}</span></td>
+            <td style="text-align: right; padding-right: 15px;"><strong>${item.name}</strong></td>
             <td>${item.code}</td>
             <td>${item.classRoom || '-'}</td>
             <td><span style="background: ${badgeColor}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold;">إنذار رقم ${item.warningNumber}</span></td>
             <td><strong style="color:red; font-size:15px;">${item.totalAbsentAtThatTime} أيام</strong></td>
-            <td><span style="color: #2c3e50; font-weight: bold; background: #ecf0f1; padding: 3px 8px; border-radius: 3px;">${item.warningDate}</span></td>
         </tr>`;
     });
 
