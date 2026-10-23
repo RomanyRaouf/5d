@@ -219,11 +219,7 @@ let isToday = item.warningDate.includes(todayStr);
 let rowBackground = isToday ? 'background-color: #fff9db;' : '';
 
         
-        // هل هذا الإنذار مستحق اليوم؟ (تمييز بصري خفيف لخلايا إنذارات اليوم الحالي لسهولة رصدها)
-        let todayStr = new Date().toISOString().split('T')[0];
-        let isToday = item.warningDate.includes(todayStr); // يمكنك ربطها بيوم اليوم ديناميكياً
-        let rowBackground = isToday ? 'background-color: #fff9db;' : '';
-
+     
         html += `<tr style="${rowBackground}">
             <td><span style="color: #2c3e50; font-weight: bold; background: #ecf0f1; padding: 3px 8px; border-radius: 3px;">${item.warningDate}</span></td>
             <td style="text-align: right; padding-right: 15px;"><strong>${item.name}</strong></td>
