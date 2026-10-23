@@ -215,7 +215,8 @@
         let badgeColor = item.warningNumber === 1 ? '#f0ad4e' : (item.warningNumber === 2 ? '#d9534f' : '#b92c28');
         
         // هل هذا الإنذار مستحق اليوم؟ (تمييز بصري خفيف لخلايا إنذارات اليوم الحالي لسهولة رصدها)
-        let isToday = item.warningDate.includes("2026-09-28"); // يمكنك ربطها بيوم اليوم ديناميكياً
+        let todaystr = new Date().toISOstring().split('T')[0];
+        let isToday = item.warningDate.includes(todaystr); // يمكنك ربطها بيوم اليوم ديناميكياً
         let rowBackground = isToday ? 'background-color: #fff9db;' : '';
 
         html += `<tr style="${rowBackground}">
